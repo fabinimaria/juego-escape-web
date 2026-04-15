@@ -1,0 +1,1304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Juego de Escape: La Caja Negra</title>
+  <style>
+    * { box-sizing: border-box; }
+
+    :root {
+      --bg1: #6f5136;
+      --bg2: #4b3522;
+      --panel: rgba(245, 233, 210, 0.9);
+      --panel2: rgba(233, 216, 188, 0.95);
+      --border: #7b5f3e;
+      --text: #2e2015;
+      --muted: #5f4731;
+      --cyan: #8a6744;
+      --green: #4f6a3f;
+      --red: #8b3d2f;
+      --shadow: 0 16px 36px rgba(22, 14, 8, 0.35);
+      --font-ui: "Palatino", "Book Antiqua", "Times New Roman", serif;
+      --font-mono: "Courier New", "Lucida Console", monospace;
+    }
+
+    body {
+      margin: 0;
+      font-family: var(--font-ui);
+      background:
+        radial-gradient(circle at 25% 0%, rgba(255, 241, 215, 0.12), transparent 36%),
+        radial-gradient(circle at 86% 14%, rgba(167, 130, 86, 0.18), transparent 34%),
+        linear-gradient(180deg, var(--bg2), var(--bg1));
+      color: var(--text);
+      min-height: 100vh;
+      position: relative;
+      overflow-x: hidden;
+    }
+
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background-image: radial-gradient(rgba(42, 26, 13, 0.08) 1px, transparent 1px);
+      background-size: 3px 3px;
+      pointer-events: none;
+      opacity: 0.25;
+      z-index: 0;
+    }
+
+    .screen {
+      display: none;
+      min-height: 100vh;
+      padding: 30px 18px;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .screen::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      background: radial-gradient(circle at center, transparent 40%, rgba(0, 0, 0, 0.48) 100%);
+      z-index: 0;
+    }
+
+    .screen.active {
+      display: flex;
+      animation: fadeIn 420ms ease;
+    }
+
+    .screen.shake {
+      animation: shake 360ms cubic-bezier(.36,.07,.19,.97);
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    @keyframes shake {
+      10%, 90% { transform: translateX(-1px); }
+      20%, 80% { transform: translateX(2px); }
+      30%, 50%, 70% { transform: translateX(-4px); }
+      40%, 60% { transform: translateX(4px); }
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--border);
+      border-radius: 22px;
+      padding: 26px;
+      max-width: 1100px;
+      width: 100%;
+      box-shadow: var(--shadow);
+      backdrop-filter: blur(8px);
+      position: relative;
+      overflow: hidden;
+      z-index: 2;
+    }
+
+    .panel::before {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(140deg, rgba(255, 250, 238, 0.6), transparent 38%, rgba(144, 108, 73, 0.14));
+      pointer-events: none;
+    }
+
+    .panel::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: 0;
+      height: 3px;
+      background: linear-gradient(90deg, transparent, rgba(115, 86, 58, 0.52), transparent);
+      pointer-events: none;
+    }
+
+    .panel.pulse {
+      animation: pulsePanel 420ms ease;
+    }
+
+    @keyframes pulsePanel {
+      0% { box-shadow: var(--shadow); }
+      40% { box-shadow: 0 0 0 2px rgba(133, 102, 64, 0.45), 0 16px 36px rgba(22, 14, 8, 0.35); }
+      100% { box-shadow: var(--shadow); }
+    }
+
+    .hero {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 22px;
+      align-items: stretch;
+    }
+
+    .title {
+      font-size: clamp(2.3rem, 6vw, 4.4rem);
+      margin: 0 0 14px;
+      line-height: 0.92;
+      font-weight: 900;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+    }
+
+    .glow {
+      color: #64462a;
+      text-shadow: 1px 1px 0 rgba(255, 248, 233, 0.45);
+    }
+
+    p {
+      line-height: 1.55;
+      color: var(--muted);
+      margin: 0;
+    }
+
+    h2, h3 {
+      margin-top: 0;
+    }
+
+    .terminal {
+      background: linear-gradient(180deg, rgba(241, 228, 202, 0.95), rgba(227, 207, 173, 0.95));
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 18px;
+      font-family: var(--font-mono);
+      white-space: pre-line;
+      color: #4e3a26;
+      line-height: 1.6;
+      min-height: 100%;
+      box-shadow: inset 0 0 0 1px rgba(123, 95, 62, 0.2);
+    }
+
+    .hero-evidence {
+      margin-top: 16px;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .evidence-shot {
+      border: 1px solid rgba(124, 92, 60, 0.5);
+      border-radius: 12px;
+      background: linear-gradient(160deg, rgba(252, 244, 228, 0.95), rgba(230, 212, 182, 0.92));
+      padding: 10px;
+      min-height: 94px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      box-shadow: inset 0 0 0 1px rgba(124, 92, 60, 0.2);
+      transform: rotate(var(--tilt));
+    }
+
+    .evidence-shot .emoji {
+      font-size: 24px;
+      line-height: 1;
+    }
+
+    .evidence-shot .cap {
+      font-size: 11px;
+      color: #5a422c;
+      opacity: 0.88;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+
+    button {
+      padding: 12px 18px;
+      border: none;
+      border-radius: 12px;
+      font-size: 15px;
+      font-weight: 800;
+      cursor: pointer;
+      transition: transform 0.15s ease, opacity 0.15s ease, box-shadow 0.2s ease;
+      font-family: var(--font-ui);
+    }
+
+    button:hover {
+      opacity: 0.98;
+      transform: translateY(-1px);
+      box-shadow: 0 8px 20px rgba(0, 0, 0, 0.28);
+    }
+
+    .primary {
+      background: linear-gradient(120deg, #7a5a39, #5f452b);
+      color: #fff2de;
+    }
+
+    .secondary {
+      background: #d3bc95;
+      color: #3a2a1a;
+      border: 1px solid var(--border);
+    }
+
+    .btn-row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-top: 20px;
+    }
+
+    .game-layout {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 18px;
+    }
+
+    .sidebar, .main-panel {
+      background: var(--panel2);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 18px;
+    }
+
+    .stat-grid {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 18px;
+    }
+
+    .mission-meter {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px;
+      background: rgba(255, 251, 243, 0.55);
+      margin-bottom: 16px;
+    }
+
+    .meter {
+      margin-top: 8px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(110, 79, 50, 0.25);
+      border: 1px solid rgba(96, 70, 45, 0.4);
+      overflow: hidden;
+    }
+
+    .meter-fill {
+      height: 100%;
+      width: 0%;
+      border-radius: inherit;
+      background: linear-gradient(90deg, #9d7b4d, #6e4f31);
+      transition: width 280ms ease;
+      box-shadow: 0 0 10px rgba(103, 74, 45, 0.35);
+    }
+
+    .stat {
+      background: rgba(254, 247, 233, 0.45);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .stat-label {
+      color: var(--muted);
+      font-size: 13px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .stat-value {
+      font-size: 29px;
+      font-weight: 900;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .door-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .door-item {
+      padding: 10px 12px;
+      border-radius: 12px;
+      border: 1px solid var(--border);
+      background: rgba(255, 247, 227, 0.45);
+      font-size: 14px;
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .door-item.done {
+      border-color: rgba(79, 106, 63, 0.6);
+      color: var(--green);
+      background: rgba(207, 221, 189, 0.7);
+    }
+
+    .door-header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 14px;
+      margin-bottom: 10px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      padding: 8px 12px;
+      border-radius: 999px;
+      border: 1px solid rgba(114, 84, 52, 0.45);
+      color: #5f4228;
+      background: rgba(255, 245, 223, 0.82);
+      font-size: 13px;
+      font-weight: 800;
+      white-space: nowrap;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .subtitle {
+      color: var(--muted);
+      margin-top: -2px;
+      margin-bottom: 14px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      overflow: hidden;
+      border-radius: 14px;
+      border: 1px solid var(--border);
+      margin-top: 14px;
+      margin-bottom: 16px;
+      background: rgba(255, 250, 240, 0.6);
+    }
+
+    th, td {
+      padding: 11px 10px;
+      border-bottom: 1px solid rgba(117, 86, 54, 0.5);
+      text-align: left;
+      font-size: 14px;
+    }
+
+    th {
+      background: rgba(163, 129, 89, 0.2);
+      color: #5f4228;
+      font-weight: 800;
+    }
+
+    tr:last-child td {
+      border-bottom: none;
+    }
+
+    .granted {
+      color: var(--green);
+      font-weight: 800;
+    }
+
+    .denied {
+      color: var(--red);
+      font-weight: 800;
+    }
+
+    .controls {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin-top: 8px;
+    }
+
+    .control-box {
+      background: rgba(255, 248, 231, 0.5);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .control-box label {
+      display: block;
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 8px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    select, input {
+      width: 100%;
+      padding: 11px;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      background: #fff6e5;
+      color: var(--text);
+      font-size: 14px;
+      font-family: var(--font-ui);
+      outline: none;
+    }
+
+    select:focus, input:focus {
+      border-color: #8d6840;
+      box-shadow: 0 0 0 2px rgba(141, 104, 64, 0.24);
+    }
+
+    .feedback {
+      margin-top: 16px;
+      min-height: 58px;
+      border: 1px solid var(--border);
+      background: rgba(255, 248, 236, 0.7);
+      border-radius: 14px;
+      padding: 14px;
+      display: flex;
+      align-items: center;
+      font-weight: 800;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .feedback.success {
+      border-color: rgba(79, 106, 63, 0.6);
+      background: rgba(211, 229, 193, 0.8);
+    }
+
+    .feedback.fail {
+      border-color: rgba(139, 61, 47, 0.6);
+      background: rgba(235, 204, 196, 0.8);
+    }
+
+    .feedback::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(110deg, transparent 10%, rgba(119, 88, 58, 0.12) 35%, transparent 60%);
+      transform: translateX(-120%);
+      transition: transform 350ms ease;
+      pointer-events: none;
+    }
+
+    .feedback.success::after,
+    .feedback.fail::after {
+      transform: translateX(120%);
+    }
+
+    .small {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    #gameScreen {
+      perspective: 1100px;
+    }
+
+    #gameScreen::before {
+      content: "";
+      position: absolute;
+      inset: 6% 4%;
+      border: 1px solid rgba(120, 90, 59, 0.35);
+      border-radius: 26px;
+      transform: rotateX(8deg);
+      pointer-events: none;
+      z-index: 1;
+      box-shadow: inset 0 0 48px rgba(126, 93, 57, 0.12);
+    }
+
+    .cage-bars {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1;
+      background:
+        repeating-linear-gradient(
+          90deg,
+          rgba(96, 70, 45, 0.05) 0px,
+          rgba(96, 70, 45, 0.05) 10px,
+          transparent 10px,
+          transparent 58px
+        );
+      mix-blend-mode: multiply;
+      opacity: 0.22;
+    }
+
+    .evidence-board {
+      margin: 12px 0 16px;
+      border: 1px dashed rgba(116, 87, 57, 0.45);
+      border-radius: 14px;
+      padding: 12px;
+      background: rgba(244, 232, 210, 0.62);
+    }
+
+    .evidence-board h4 {
+      margin: 0 0 10px;
+      font-size: 13px;
+      letter-spacing: 0.05em;
+      text-transform: uppercase;
+      color: #5f4228;
+    }
+
+    .evidence-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .evidence-card {
+      border: 1px solid rgba(142, 110, 76, 0.48);
+      background: linear-gradient(170deg, rgba(254, 247, 232, 0.95), rgba(237, 220, 189, 0.9));
+      border-radius: 10px;
+      padding: 10px;
+      min-height: 98px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      position: relative;
+    }
+
+    .evidence-card::before {
+      content: "";
+      position: absolute;
+      top: -6px;
+      left: 12px;
+      width: 28px;
+      height: 8px;
+      border-radius: 20px;
+      background: rgba(170, 135, 91, 0.58);
+      transform: rotate(-6deg);
+    }
+
+    .evidence-head {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+      font-weight: 800;
+      color: #4d3620;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .evidence-icon {
+      font-size: 20px;
+      line-height: 1;
+    }
+
+    .evidence-note {
+      margin-top: 6px;
+      color: #5f4731;
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    .scene-decor {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 0;
+      overflow: hidden;
+    }
+
+    .orb {
+      position: absolute;
+      width: 360px;
+      aspect-ratio: 1;
+      border-radius: 50%;
+      filter: blur(60px);
+      opacity: 0.26;
+      animation: floatOrb 8s ease-in-out infinite alternate;
+    }
+
+    .orb.one {
+      background: #b58b57;
+      top: -140px;
+      left: -80px;
+    }
+
+    .orb.two {
+      background: #8a6542;
+      right: -120px;
+      bottom: -160px;
+      animation-duration: 11s;
+    }
+
+    @keyframes floatOrb {
+      0% { transform: translateY(0) scale(1); }
+      100% { transform: translateY(34px) scale(1.08); }
+    }
+
+    #sparkLayer {
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1000;
+      overflow: hidden;
+    }
+
+    .spark {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--cyan);
+      opacity: 0;
+      animation: sparkFly 700ms ease-out forwards;
+    }
+
+    .spark.good { background: var(--green); }
+    .spark.bad { background: var(--red); }
+
+    @keyframes sparkFly {
+      0% { transform: translate(0, 0) scale(1); opacity: 1; }
+      100% { transform: translate(var(--tx), var(--ty)) scale(0.2); opacity: 0; }
+    }
+
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(3, 7, 14, 0.8);
+      justify-content: center;
+      align-items: center;
+      padding: 20px;
+      z-index: 999;
+    }
+
+    .modal-backdrop.show {
+      display: flex;
+      animation: fadeIn 250ms ease;
+    }
+
+    .modal {
+      max-width: 720px;
+      width: 100%;
+      background: linear-gradient(180deg, #f8ecd4, #e5cfaa);
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      padding: 24px;
+      box-shadow: var(--shadow);
+    }
+
+    .concept-tag {
+      display: inline-block;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(79, 106, 63, 0.12);
+      color: #4f6a3f;
+      border: 1px solid rgba(79, 106, 63, 0.32);
+      font-size: 13px;
+      font-weight: 800;
+      margin-bottom: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .end-center {
+      text-align: center;
+      max-width: 760px;
+      margin: 0 auto;
+    }
+
+    .score-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 14px;
+      margin: 22px 0;
+    }
+
+    @media (max-width: 900px) {
+      .hero,
+      .game-layout,
+      .controls,
+      .score-grid,
+      .hero-evidence,
+      .evidence-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .panel {
+        padding: 20px;
+      }
+
+      .title {
+        line-height: 0.98;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="scene-decor" aria-hidden="true">
+    <div class="orb one"></div>
+    <div class="orb two"></div>
+  </div>
+
+  <section id="startScreen" class="screen active">
+    <div class="panel">
+      <div class="hero">
+        <div>
+          <h1 class="title">JUEGO DE<br><span class="glow">ESCAPE</span></h1>
+          <p>
+            Estás atrapada dentro de un sistema de decisiones. Cada puerta responde a un concepto distinto de machine learning.
+            Entendé el modelo. Escapá del sistema.
+          </p>
+          <div class="btn-row">
+            <button id="playBtn" class="primary">Jugar</button>
+            <button id="howBtn" class="secondary">Cómo funciona</button>
+          </div>
+          <div class="hero-evidence">
+            <div class="evidence-shot" style="--tilt:-3deg;">
+              <span class="emoji">📸</span>
+              <span class="cap">Cámara térmica</span>
+            </div>
+            <div class="evidence-shot" style="--tilt:2deg;">
+              <span class="emoji">🧪</span>
+              <span class="cap">Muestra del modelo</span>
+            </div>
+            <div class="evidence-shot" style="--tilt:-1deg;">
+              <span class="emoji">🧠</span>
+              <span class="cap">Mapa de decisiones</span>
+            </div>
+          </div>
+        </div>
+        <div class="terminal">> NÚCLEO IA ACTIVO
+> ARCHIVO 221B ABIERTO
+> PISTAS CLASIFICADAS POR EL INSPECTOR
+> EL CASO EXIGE DEDUCCIÓN
+
+Atraviesa 5 puertas.
+Descifra cada modelo.
+Escapa de la caja.</div>
+      </div>
+    </div>
+  </section>
+
+  <section id="gameScreen" class="screen">
+    <div class="cage-bars" aria-hidden="true"></div>
+    <div class="panel">
+      <div class="game-layout">
+        <aside class="sidebar">
+          <h3>Consola de misión</h3>
+
+          <div class="stat-grid">
+            <div class="stat">
+              <div class="stat-label">Puerta</div>
+              <div class="stat-value" id="doorNumber">1 / 5</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Intentos</div>
+              <div class="stat-value" id="attemptsValue">0</div>
+            </div>
+            <div class="stat">
+              <div class="stat-label">Puntaje</div>
+              <div class="stat-value" id="scoreValue">1000</div>
+            </div>
+          </div>
+
+          <div class="small" style="margin-bottom:10px; font-weight:700;">Progreso de puertas</div>
+          <div id="doorList" class="door-list"></div>
+
+          <div class="mission-meter">
+            <div class="small" style="font-weight:700;">Nivel de infiltración</div>
+            <div class="meter">
+              <div id="progressFill" class="meter-fill"></div>
+            </div>
+          </div>
+        </aside>
+
+        <main class="main-panel">
+          <div class="door-header">
+            <div>
+              <h2 id="doorTitle">Puerta 1</h2>
+              <div id="doorSubtitle" class="subtitle">Subtítulo del desafío</div>
+            </div>
+            <div id="doorBadge" class="badge">IMPORTANCIA DE VARIABLES</div>
+          </div>
+
+          <p id="doorStory"></p>
+          <div class="evidence-board">
+            <h4>Mesa de evidencia</h4>
+            <div id="evidenceWall" class="evidence-grid"></div>
+          </div>
+
+          <table id="examplesTable"></table>
+
+          <div id="controlsArea" class="controls"></div>
+
+          <div class="btn-row">
+            <button id="predictBtn" class="primary">Ejecutar predicción</button>
+            <button id="resetBtn" class="secondary">Reiniciar</button>
+          </div>
+
+          <div id="feedbackBox" class="feedback">
+            Esperando tu próximo caso de prueba...
+          </div>
+        </main>
+      </div>
+    </div>
+  </section>
+
+  <section id="endScreen" class="screen">
+    <div class="panel end-center">
+      <h2 style="font-size:42px; margin-bottom:10px;">LOGRASTE ESCAPAR<br><span class="glow">DEL LABERINTO</span></h2>
+      <p>
+        El sistema no estaba diseñado para que lo entendieras. Igual lo descifraste.
+      </p>
+
+      <div class="score-grid">
+        <div class="stat">
+          <div class="stat-label">Puntaje final</div>
+          <div id="finalScore" class="stat-value">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Intentos totales</div>
+          <div id="finalAttempts" class="stat-value">0</div>
+        </div>
+        <div class="stat">
+          <div class="stat-label">Puertas resueltas</div>
+          <div class="stat-value">5</div>
+        </div>
+      </div>
+
+      <button id="restartBtn" class="primary">Jugar otra vez</button>
+    </div>
+  </section>
+
+  <div id="conceptModal" class="modal-backdrop">
+    <div class="modal">
+      <div id="modalTag" class="concept-tag">IMPORTANCIA DE VARIABLES</div>
+      <h3 id="modalTitle">Puerta desbloqueada</h3>
+      <p id="modalReasoning"></p>
+      <div class="btn-row">
+        <button id="nextDoorBtn" class="primary">Siguiente puerta</button>
+      </div>
+    </div>
+  </div>
+  <div id="sparkLayer" aria-hidden="true"></div>
+
+  <script>
+    const doors = [
+      {
+        id: 1,
+        concept: "Importancia de Variables",
+        badge: "IMPORTANCIA DE VARIABLES",
+        title: "Puerta 1 - Importancia de Variables",
+        subtitle: "Descubrí qué variable realmente le importa al modelo.",
+        story: "Esta compuerta recibe tres entradas, pero como muchos modelos, solo atiende lo que realmente pesa en la decisión.",
+        columns: ["Color de credencial", "Número de ID", "Hora de llegada", "Salida"],
+        examples: [
+          ["Verde", 12, 8, true],
+          ["Verde", 55, 14, true],
+          ["Rojo", 12, 8, false],
+          ["Azul", 55, 14, false]
+        ],
+        controls: [
+          { key: "color", label: "Color de credencial", type: "select", options: ["Verde", "Rojo", "Azul"], value: "Rojo" },
+          { key: "id", label: "Número de ID", type: "number", min: 1, max: 99, value: 42 },
+          { key: "hour", label: "Hora de llegada", type: "number", min: 0, max: 23, value: 10 }
+        ],
+        evaluate(input) {
+          return input.color === "Verde";
+        },
+        solvedCheck(input, granted) {
+          return granted && input.color === "Verde";
+        },
+        reasoning: "La decisión dependía de una sola variable: el color de la credencial. Las demás eran distracciones. En ML esto es importancia de variables: no todas aportan igual al resultado."
+      },
+      {
+        id: 2,
+        concept: "Correlación Espuria",
+        badge: "CORRELACIÓN ESPURIA",
+        title: "Puerta 2 - Correlación Espuria",
+        subtitle: "Un patrón puede parecer causal sin serlo.",
+        story: "Este sistema se entrenó con observaciones donde dos variables aparecían juntas. Tu tarea es detectar cuál señal es la que verdaderamente manda.",
+        columns: ["Paraguas", "Cielo nublado", "Salida"],
+        examples: [
+          ["Sí", "Sí", true],
+          ["No", "No", false],
+          ["Sí", "Sí", true],
+          ["No", "No", false]
+        ],
+        controls: [
+          { key: "umbrella", label: "Paraguas", type: "select", options: ["Sí", "No"], value: "Sí" },
+          { key: "cloudy", label: "Cielo nublado", type: "select", options: ["Sí", "No"], value: "No" }
+        ],
+        evaluate(input) {
+          return input.cloudy === "Sí";
+        },
+        solvedCheck(input, granted) {
+          return granted && input.cloudy === "Sí" && input.umbrella === "No";
+        },
+        reasoning: "Al principio parecía que el paraguas explicaba el resultado, pero el modelo respondía al cielo nublado. Esto es correlación espuria: una variable puede parecer predictiva por acompañar a la señal real."
+      },
+      {
+        id: 3,
+        concept: "Sobreajuste",
+        badge: "SOBREAJUSTE",
+        title: "Puerta 3 - Sobreajuste",
+        subtitle: "Lo que luce perfecto en entrenamiento puede fallar en casos nuevos.",
+        story: "Esta cerradura fue construida por un modelo que memorizó un conjunto muy chico. Parece brillante hasta que le pedís generalizar.",
+        columns: ["Número de código", "Salida"],
+        examples: [
+          [1, true],
+          [2, false],
+          [3, true],
+          [4, false]
+        ],
+        controls: [
+          { key: "code", label: "Número de código", type: "number", min: 1, max: 20, value: 5 }
+        ],
+        evaluate(input) {
+          return input.code <= 3;
+        },
+        solvedCheck(input, granted) {
+          return granted && input.code === 3;
+        },
+        reasoning: "Los ejemplos visibles te empujan a reglas más complejas, como impar contra par. Pero la regla real era más simple. Ese es el sobreajuste: memorizar patrones del entrenamiento en lugar de aprender una regla que generalice."
+      },
+      {
+        id: 4,
+        concept: "Sesgo",
+        badge: "SESGO",
+        title: "Puerta 4 - Sesgo",
+        subtitle: "Un modelo puede aprender decisiones injustas desde los datos.",
+        story: "El sistema debería premiar alto rendimiento, pero una variable injusta está dominando la decisión.",
+        columns: ["Puntaje de desempeño", "Años de experiencia", "Grupo etario", "Salida"],
+        examples: [
+          [92, 6, "Mayor", true],
+          [92, 6, "Joven", false],
+          [88, 5, "Mayor", true],
+          [88, 5, "Joven", false]
+        ],
+        controls: [
+          { key: "score", label: "Puntaje de desempeño", type: "number", min: 0, max: 100, value: 92 },
+          { key: "experience", label: "Años de experiencia", type: "number", min: 0, max: 40, value: 6 },
+          { key: "age", label: "Grupo etario", type: "select", options: ["Joven", "Mayor"], value: "Joven" }
+        ],
+        evaluate(input) {
+          return input.age === "Mayor";
+        },
+        solvedCheck(input, granted) {
+          return granted && input.age === "Mayor";
+        },
+        reasoning: "Aunque el rendimiento y la experiencia eran altos, el modelo decidió casi solo por grupo etario. Eso es sesgo: aprender un patrón injusto y darle demasiado peso a una variable problemática."
+      },
+      {
+        id: 5,
+        concept: "Selección de Modelo",
+        badge: "SELECCIÓN DE MODELO",
+        title: "Puerta 5 - Selección de Modelo",
+        subtitle: "El mejor modelo no siempre es el más complejo.",
+        story: "Esta cerradura final te deja elegir cuántas variables usará el modelo. Muy pocas subajustan. Demasiadas agregan complejidad innecesaria. Encontrá el equilibrio.",
+        columns: ["Variables usadas", "Interpretabilidad", "Generalización", "Salida"],
+        examples: [
+          [1, "Alta", "Baja", false],
+          [2, "Alta", "Alta", true],
+          [3, "Media", "Alta", true],
+          [5, "Baja", "Baja", false]
+        ],
+        controls: [
+          { key: "features", label: "Variables usadas", type: "select", options: ["1", "2", "3", "4", "5"], value: "4" },
+          { key: "interpretability", label: "Interpretabilidad", type: "select", options: ["Alta", "Media", "Baja"], value: "Baja" },
+          { key: "generalization", label: "Generalización", type: "select", options: ["Baja", "Alta"], value: "Baja" }
+        ],
+        evaluate(input) {
+          return (input.features === "2" || input.features === "3") && input.generalization === "Alta";
+        },
+        solvedCheck(input, granted) {
+          return granted && (input.features === "2" || input.features === "3");
+        },
+        reasoning: "Con muy pocas variables, el modelo puede subajustar. Con demasiadas, pierde claridad y utilidad. Selección de modelo es elegir el punto justo entre rendimiento, simplicidad y generalización."
+      }
+    ];
+
+    const startScreen = document.getElementById("startScreen");
+    const gameScreen = document.getElementById("gameScreen");
+    const endScreen = document.getElementById("endScreen");
+
+    const playBtn = document.getElementById("playBtn");
+    const howBtn = document.getElementById("howBtn");
+    const restartBtn = document.getElementById("restartBtn");
+    const nextDoorBtn = document.getElementById("nextDoorBtn");
+
+    const doorNumber = document.getElementById("doorNumber");
+    const attemptsValue = document.getElementById("attemptsValue");
+    const scoreValue = document.getElementById("scoreValue");
+    const doorList = document.getElementById("doorList");
+    const progressFill = document.getElementById("progressFill");
+
+    const doorTitle = document.getElementById("doorTitle");
+    const doorSubtitle = document.getElementById("doorSubtitle");
+    const doorBadge = document.getElementById("doorBadge");
+    const doorStory = document.getElementById("doorStory");
+    const examplesTable = document.getElementById("examplesTable");
+    const evidenceWall = document.getElementById("evidenceWall");
+    const controlsArea = document.getElementById("controlsArea");
+    const feedbackBox = document.getElementById("feedbackBox");
+    const predictBtn = document.getElementById("predictBtn");
+    const resetBtn = document.getElementById("resetBtn");
+    const sparkLayer = document.getElementById("sparkLayer");
+    const gamePanel = document.querySelector("#gameScreen .panel");
+
+    const conceptModal = document.getElementById("conceptModal");
+    const modalTag = document.getElementById("modalTag");
+    const modalTitle = document.getElementById("modalTitle");
+    const modalReasoning = document.getElementById("modalReasoning");
+
+    const finalScore = document.getElementById("finalScore");
+    const finalAttempts = document.getElementById("finalAttempts");
+
+    let currentDoorIndex = 0;
+    let totalAttempts = 0;
+    let score = 1000;
+    let solvedDoors = new Set();
+
+    function showScreen(screen) {
+      startScreen.classList.remove("active");
+      gameScreen.classList.remove("active");
+      endScreen.classList.remove("active");
+      screen.classList.add("active");
+    }
+
+    function renderDoorList() {
+      doorList.innerHTML = "";
+      doors.forEach((door, index) => {
+        const item = document.createElement("div");
+        item.className = "door-item" + (solvedDoors.has(index) ? " done" : "");
+        item.innerHTML = `<span>${door.id}. ${door.concept}</span><span>${solvedDoors.has(index) ? "✓" : "..."}</span>`;
+        doorList.appendChild(item);
+      });
+    }
+
+    function renderExamples(door) {
+      let html = "<tr>";
+      door.columns.forEach(col => {
+        html += `<th>${col}</th>`;
+      });
+      html += "</tr>";
+
+      door.examples.forEach(row => {
+        html += "<tr>";
+        row.forEach((cell, idx) => {
+          if (idx === row.length - 1 && typeof cell === "boolean") {
+            html += `<td class="${cell ? "granted" : "denied"}">${cell ? "Concedido" : "Denegado"}</td>`;
+          } else {
+            html += `<td>${cell}</td>`;
+          }
+        });
+        html += "</tr>";
+      });
+
+      examplesTable.innerHTML = html;
+    }
+
+    function getEvidenceByDoor(doorId) {
+      const wall = {
+        1: [
+          { icon: "🟩", title: "Frame A", note: "El sensor responde al color, no al ID." },
+          { icon: "🪪", title: "Credencial", note: "IDs distintos, mismo resultado cuando hay verde." },
+          { icon: "⏱️", title: "Reloj", note: "La hora parece ruido en esta puerta." }
+        ],
+        2: [
+          { icon: "☁️", title: "Clima", note: "Cuando hay nubes, sube la probabilidad de acceso." },
+          { icon: "☂️", title: "Paraguas", note: "Variable acompañante: parece causal, pero no manda." },
+          { icon: "🕵️", title: "Pista", note: "Separá correlación de causa real." }
+        ],
+        3: [
+          { icon: "🧩", title: "Patrón", note: "Regla simple escondida entre ejemplos engañosos." },
+          { icon: "📉", title: "Generaliza", note: "Memorizar no equivale a entender." },
+          { icon: "🔢", title: "Código", note: "Probá casos fuera del patrón visual inmediato." }
+        ],
+        4: [
+          { icon: "⚖️", title: "Equidad", note: "La decisión no está siendo justa." },
+          { icon: "👥", title: "Grupo", note: "Una variable sensible domina demasiado." },
+          { icon: "🚨", title: "Alerta", note: "Sesgo detectado en criterios de acceso." }
+        ],
+        5: [
+          { icon: "🎛️", title: "Complejidad", note: "Más variables no siempre mejora el modelo." },
+          { icon: "🧭", title: "Balance", note: "Buscá equilibrio entre claridad y performance." },
+          { icon: "📦", title: "Selección", note: "El mejor modelo es el que mejor generaliza." }
+        ]
+      };
+      return wall[doorId] || [];
+    }
+
+    function renderEvidence(door) {
+      const entries = getEvidenceByDoor(door.id);
+      evidenceWall.innerHTML = entries.map(item => `
+        <article class="evidence-card">
+          <div class="evidence-head">
+            <span class="evidence-icon">${item.icon}</span>
+            <span>${item.title}</span>
+          </div>
+          <p class="evidence-note">${item.note}</p>
+        </article>
+      `).join("");
+    }
+
+    function renderControls(door) {
+      controlsArea.innerHTML = "";
+
+      door.controls.forEach(control => {
+        const box = document.createElement("div");
+        box.className = "control-box";
+
+        let inputHTML = "";
+
+        if (control.type === "select") {
+          inputHTML = `<select id="control-${control.key}">
+            ${control.options.map(opt => `<option value="${opt}" ${opt === control.value ? "selected" : ""}>${opt}</option>`).join("")}
+          </select>`;
+        } else if (control.type === "number") {
+          inputHTML = `<input id="control-${control.key}" type="number" min="${control.min}" max="${control.max}" value="${control.value}">`;
+        }
+
+        box.innerHTML = `
+          <label>${control.label}</label>
+          ${inputHTML}
+        `;
+
+        controlsArea.appendChild(box);
+      });
+    }
+
+    function getCurrentInput(door) {
+      const input = {};
+      door.controls.forEach(control => {
+        const el = document.getElementById(`control-${control.key}`);
+        input[control.key] = el.value;
+        if (control.type === "number") {
+          input[control.key] = Number(el.value);
+        }
+      });
+      return input;
+    }
+
+    function updateStats() {
+      doorNumber.textContent = `${currentDoorIndex + 1} / ${doors.length}`;
+      attemptsValue.textContent = totalAttempts;
+      scoreValue.textContent = score;
+      progressFill.style.width = `${(solvedDoors.size / doors.length) * 100}%`;
+    }
+
+    function triggerScreenShake() {
+      gameScreen.classList.remove("shake");
+      void gameScreen.offsetWidth;
+      gameScreen.classList.add("shake");
+      setTimeout(() => gameScreen.classList.remove("shake"), 380);
+    }
+
+    function triggerPanelPulse() {
+      gamePanel.classList.remove("pulse");
+      void gamePanel.offsetWidth;
+      gamePanel.classList.add("pulse");
+      setTimeout(() => gamePanel.classList.remove("pulse"), 430);
+    }
+
+    function spawnSparks(isSuccess) {
+      const rect = feedbackBox.getBoundingClientRect();
+      const baseX = rect.left + rect.width / 2;
+      const baseY = rect.top + rect.height / 2;
+
+      for (let i = 0; i < 16; i += 1) {
+        const spark = document.createElement("span");
+        spark.className = `spark ${isSuccess ? "good" : "bad"}`;
+        const angle = (Math.PI * 2 * i) / 16;
+        const distance = 24 + Math.random() * 56;
+        const x = Math.cos(angle) * distance;
+        const y = Math.sin(angle) * distance;
+        spark.style.left = `${baseX}px`;
+        spark.style.top = `${baseY}px`;
+        spark.style.setProperty("--tx", `${x}px`);
+        spark.style.setProperty("--ty", `${y}px`);
+        sparkLayer.appendChild(spark);
+        setTimeout(() => spark.remove(), 740);
+      }
+    }
+
+    function renderDoor() {
+      const door = doors[currentDoorIndex];
+
+      doorTitle.textContent = door.title;
+      doorSubtitle.textContent = door.subtitle;
+      doorBadge.textContent = door.badge;
+      doorStory.textContent = door.story;
+
+      renderEvidence(door);
+      renderExamples(door);
+      renderControls(door);
+      renderDoorList();
+      updateStats();
+
+      feedbackBox.className = "feedback";
+      feedbackBox.textContent = "Esperando tu próximo caso de prueba...";
+    }
+
+    function startGame() {
+      currentDoorIndex = 0;
+      totalAttempts = 0;
+      score = 1000;
+      solvedDoors = new Set();
+      renderDoor();
+      showScreen(gameScreen);
+    }
+
+    playBtn.addEventListener("click", startGame);
+
+    howBtn.addEventListener("click", () => {
+      alert("Cada puerta representa un concepto de machine learning. Leé los ejemplos, probá un caso nuevo, inferí la lógica del sistema y desbloqueá el concepto detrás de la decisión.");
+    });
+
+    resetBtn.addEventListener("click", () => {
+      renderControls(doors[currentDoorIndex]);
+      feedbackBox.className = "feedback";
+      feedbackBox.textContent = "Entradas reiniciadas. Probá una nueva hipótesis.";
+    });
+
+    predictBtn.addEventListener("click", () => {
+      const door = doors[currentDoorIndex];
+      const input = getCurrentInput(door);
+      const granted = door.evaluate(input);
+
+      totalAttempts += 1;
+      score = Math.max(0, score - 15);
+
+      feedbackBox.className = "feedback " + (granted ? "success" : "fail");
+      feedbackBox.textContent = granted
+        ? "ACCESO CONCEDIDO - la caja negra aceptó este caso."
+        : "ACCESO DENEGADO - tu hipótesis todavía está incompleta.";
+      spawnSparks(granted);
+
+      updateStats();
+
+      if (door.solvedCheck(input, granted)) {
+        triggerPanelPulse();
+        solvedDoors.add(currentDoorIndex);
+        score += 120;
+
+        modalTag.textContent = door.badge;
+        modalTitle.textContent = `${door.concept} - Puerta desbloqueada`;
+        modalReasoning.textContent = door.reasoning;
+
+        renderDoorList();
+        updateStats();
+
+        setTimeout(() => {
+          conceptModal.classList.add("show");
+        }, 350);
+      } else if (!granted) {
+        triggerScreenShake();
+      }
+    });
+
+    nextDoorBtn.addEventListener("click", () => {
+      conceptModal.classList.remove("show");
+      currentDoorIndex += 1;
+
+      if (currentDoorIndex >= doors.length) {
+        finalScore.textContent = score;
+        finalAttempts.textContent = totalAttempts;
+        showScreen(endScreen);
+      } else {
+        renderDoor();
+      }
+    });
+
+    restartBtn.addEventListener("click", () => {
+      showScreen(startScreen);
+    });
+  </script>
+</body>
+</html>
